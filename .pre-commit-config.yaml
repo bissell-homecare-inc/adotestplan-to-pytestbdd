@@ -1,0 +1,38 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0  # Use the ref you want to point at
+    hooks:
+      - id: check-yaml
+      - id: debug-statements
+      - id: trailing-whitespace   # remove trailing whitespace
+  - repo: https://github.com/pre-commit/mirrors-autopep8
+    rev: 'v2.0.4'
+    hooks:
+    -   id: autopep8
+  - repo: https://github.com/asottile/seed-isort-config
+    rev: v2.2.0
+    hooks:
+      - id: seed-isort-config
+  - repo: https://github.com/timothycrosley/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: [--max-line-length=90]
+        additional_dependencies: [flake8-bugbear]
+  - repo: https://github.com/yunojuno/pre-commit-xenon
+    rev: v0.1
+    hooks:
+    - id: xenon
+      args: ["--max-average=B", "--max-modules=C", "--max-absolute=C"]
+  - repo: https://gitlab.com/smop/pre-commit-hooks
+    rev: v1.0.0
+    hooks:
+    - id: check-poetry
+  - repo: https://github.com/ikamensh/flynt/
+    rev: '1.0.1'
+    hooks:
+    -   id: flynt

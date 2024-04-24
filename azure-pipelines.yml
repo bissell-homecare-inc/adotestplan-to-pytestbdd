@@ -1,0 +1,47 @@
+trigger:
+    - main
+jobs:
+    - job: Build
+      displayName: "Build"
+      steps:
+          - script: |
+              pip3 install invoke poetry pre-commit
+              sudo apt-get install python3-tk graphviz
+              invoke update
+            displayName: "Install Project"
+
+          # note: the variables leveraged here (TEST_PROJ, etc.)_here are set in the ADO browser,
+          # on the Pipelines Variable tab, so as to avoid checking them in and conflicting with user settings.
+          - script: |
+              PAT=$(System.AccessToken) invoke check tests
+            displayName: "Check Software"
+
+          - task: PublishTestResults@2
+            displayName: 'Publish App Test Results'
+            inputs:
+              testResultsFiles: 'test_results.xml'
+              mergeTestResults: true
+              testRunTitle: 'App Tests'
+            condition: succeededOrFailed()
+
+          - script: |
+              poetry run coverage xml --skip-empty
+            displayName: Generate Code Coverage Report File
+            # other coverage arguments of interest: --show-contexts and --skip-covered
+
+          - task: PublishCodeCoverageResults@2
+            displayName: Publish Coverage results
+            inputs:
+              summaryFileLocation: 'coverage.xml'
+              pathToSources: $(System.DefaultWorkingDirectory)
+          - task: BuildQualityChecks@9
+            displayName: Check Build Quality - Line Coverage
+            inputs:
+              checkCoverage: true
+              coverageType: lines
+              coverageThreshold: '70'
+              coverageUpperThreshold: '90'
+              ignoreDecreaseAboveUpperThreshold: false
+              forceCoverageImprovement: false
+              coverageFailOption: fixed
+

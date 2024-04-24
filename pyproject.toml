@@ -1,0 +1,73 @@
+[tool.poetry]
+name = "adotestplan-to-pytestbdd"
+version = "0.1.1"
+description = "Utility for translating AzureDevOps Test Plans to Gherkin Feature file and Pytest-BDD runners"
+authors = [
+    "David VanKampen <david.vankampen@bissell.com>",
+    "Tristan VanFossen <tristan.vanfossen@bissell.com>"
+]
+readme = "README.md"
+repository = 'https://github.com/bissell-homecare-inc/adotestplan-to-pytestbdd'
+keywords = [
+    "ADO",
+    "AzureDevOps",
+    "BDD"
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Testing :: BDD",
+    "Topic :: Utilities",
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.9"
+timebudget = "^0.7.1"
+pydot = "^2.0.0"
+beautifulsoup4 = "^4.12.3"
+azure-devops = "^7.1.0b4"
+gherlint = "^0.4.0"
+thefuzz = "^0.22.1"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.1"
+pytest-bdd = "^7.1.2"
+invoke = "^2.2.0"
+coverage = "^7.4.4"
+python-dotenv = "^1.0.1" # this is the only dependency mandating Python>3.8 - good opportunity for improvement here
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.coverage.run]
+dynamic_context = "test_function" # see https://coverage.readthedocs.io/en/7.4.4/contexts.html#dynamic-contexts
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/bissell-homecare-inc/adotestplan-to-pytestbdd/issues"
+
+[tool.tox]
+legacy_tox_ini = """
+    [tox]
+    requires =
+        tox>=4
+    env_list = py{39,39,310,311,312}
+
+    [testenv]
+    description = rununit tests
+    skip_install = true
+    allowlist_externals = poetry
+    commands_pre =
+        poetry install
+    commands =
+        poetry run coverage run -m pytest --import-mode importlib
+"""

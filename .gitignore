@@ -1,0 +1,21 @@
+*.pyc
+.tox
+
+dist/*
+
+.vscode/*
+.venv
+.coverage
+.pytest_cache
+test-output.xml
+test*.xml
+gen/
+shared*
+real_tp/
+another_real_tp/
+default_tp/
+nonshared*
+# generated usage graphs
+*.svg
+coverage.xml
+.env

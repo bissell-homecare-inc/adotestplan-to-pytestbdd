@@ -853,7 +853,10 @@ class AzureDevOpsTestPlan():
         if 'Microsoft.VSTS.TCM.Parameters' in work_item.fields and \
                 len(work_item.fields['Microsoft.VSTS.TCM.Parameters']):
             parameter_table = work_item.fields['Microsoft.VSTS.TCM.Parameters']
-            table = ET.fromstring(parameter_table)
+            try:
+                table = ET.fromstring(parameter_table)
+            except ET.ParseError:
+                table = parameter_table
             if len(table):
                 return True
         if 'Microsoft.VSTS.TCM.LocalDataSource' in work_item.fields and \
@@ -878,7 +881,11 @@ class AzureDevOpsTestPlan():
         except KeyError:
             raise ValueError(
                 f"Non-Shared parameter on {work_item.id} has no values")
-        params = ET.fromstring(nonshared_parameter_table).findall('param')
+        try:
+            params = ET.fromstring(nonshared_parameter_table).findall('param')
+        except ET.ParseError:
+            # its just a string ID, shared param likely. process elsewhere.
+            return
         try:
             tables = ET.fromstring(parameter_data_source).findall('Table1')
         except ET.ParseError:

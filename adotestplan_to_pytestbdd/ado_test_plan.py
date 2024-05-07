@@ -27,6 +27,13 @@ from msrest.authentication import BasicAuthentication
 from thefuzz import fuzz
 from timebudget import timebudget
 
+from adotestplan_to_pytestbdd.exceptions import (InvalidGherkinError,
+                                                 InvalidParameterError,
+                                                 InvalidStepError,
+                                                 MissingFixturesError,
+                                                 NoTestSuiteError,
+                                                 OrderOfOperationsError)
+
 
 @dataclass
 class Step:
@@ -339,9 +346,9 @@ class AzureDevOpsTestPlan():
         '''this test plan populates a directory with BDD formatted feature files.
             it gets those feature files from an internal object self.bdd_tp, so that
             is assumed to have been populated previously'''
-
         if not self.bdd_tp.features:
-            raise ValueError("BDD Test Plan has not been initialized")
+            raise OrderOfOperationsError(
+                "BDD Test Plan has not been initialized")
         if os.path.exists(self.out_dir):
             # if it exists delete it and all files in it
             shutil.rmtree(self.out_dir)
@@ -513,7 +520,7 @@ class AzureDevOpsTestPlan():
 
     def _validate_generated_feature_against_pytest_fixtures(self, feature):
         if not os.path.exists(f"{self.out_dir}/{feature}"):
-            raise ValueError(
+            raise OSError(
                 f"Cannot validate {feature} as it is not found on disk")
         generated = self._generate_pytestbdd_for_feature(feature)
 
@@ -542,7 +549,7 @@ class AzureDevOpsTestPlan():
         if not missing_fixtures:
             logging.debug("All fixtures present")
         else:
-            raise ValueError("Missing Fixture definitions")
+            raise MissingFixturesError("Missing Fixture definitions")
 
     @timebudget
     def _generate_pytestbdd_for_feature(self, feature):
@@ -568,14 +575,20 @@ class AzureDevOpsTestPlan():
 
     def _get_list_of_feature_files(self):
         if self.out_dir is None:
-            raise ValueError(
+            raise OrderOfOperationsError(
                 f"You have not yet populated the features, \
                     or written out the feature files for {self.plan_id}")
-        files = [f for f in os.listdir(self.out_dir) if os.path.isfile(
-            os.path.join(self.out_dir, f))]
+        try:
+            files = [f for f in os.listdir(self.out_dir) if os.path.isfile(
+                os.path.join(self.out_dir, f))]
+        except FileNotFoundError:
+            raise OrderOfOperationsError(
+                f"You have not yet populated the features, \
+                    or written out the feature files for {self.plan_id} \
+                        in directory {self.out_dir}")
 
         if not len(files):
-            raise ValueError(
+            raise OrderOfOperationsError(
                 f"No feature files to generate runners for plan {self.plan_id}")
         return files
 
@@ -646,7 +659,7 @@ class AzureDevOpsTestPlan():
                 project=self.project, plan_id=self.plan_id)
             self.test_plan: TestPlan
         else:
-            raise ValueError(
+            raise OrderOfOperationsError(
                 "You have not configured a project and Test Plan ID")
 
     @timebudget
@@ -656,7 +669,7 @@ class AzureDevOpsTestPlan():
         temp = self.test_plan_client.get_test_suites_for_plan(
             project=self.project, plan_id=self.plan_id)
         if not len(temp):
-            raise ValueError(
+            raise NoTestSuiteError(
                 f"Found no test suites for {self.plan_id} under project{self.project}")
         for test_suite in temp:
             test_suite: TestSuite  # typehinting for autocompletion
@@ -666,7 +679,7 @@ class AzureDevOpsTestPlan():
                     f"Adding test suite {test_suite.name} to {self.plan_id}")
                 self._azure_test_suites.append(test_suite)
         if not len(self._azure_test_suites):
-            raise ValueError(
+            raise NoTestSuiteError(
                 f"Found no populated test suites for {self.plan_id} under {self.project}")
 
     @timebudget
@@ -879,7 +892,7 @@ class AzureDevOpsTestPlan():
         try:
             parameter_data_source = work_item.fields['Microsoft.VSTS.TCM.LocalDataSource']
         except KeyError:
-            raise ValueError(
+            raise InvalidParameterError(
                 f"Non-Shared parameter on {work_item.id} has no values")
         try:
             params = ET.fromstring(nonshared_parameter_table).findall('param')
@@ -892,7 +905,7 @@ class AzureDevOpsTestPlan():
             # a shared param, likely. process elsewhere
             return
         if not len(tables):
-            raise ValueError(
+            raise InvalidParameterError(
                 "non-shared parameter on {work_item.id} has no table contents")
         for param in params:  # not sure how fragile this is...
             param_name = param.attrib['name']
@@ -926,7 +939,7 @@ class AzureDevOpsTestPlan():
         # with the pytest-bdd <variable> notation
         words = content.split(" ")
         if words[0].lower() not in self.valid_starters:
-            raise ValueError(
+            raise InvalidGherkinError(
                 f"{parent_id} step \"{content}\" does not start with one of {self.valid_starters}")  # noqa: E501
         for word in words:
             if "@" in word:
@@ -949,7 +962,7 @@ class AzureDevOpsTestPlan():
         if step_title in work_item.fields:
             steps = work_item.fields[step_title]
         else:
-            raise ValueError(
+            raise InvalidStepError(
                 f"{work_item.id}::{work_item.fields['System.Title']} has no steps")
 
         # now that we know this work item has some steps, lets see if they are
@@ -1164,7 +1177,7 @@ class AzureDevOpsTestPlan():
 
             graph.write_svg(f"{self.plan_id}.svg")
         else:
-            raise ValueError("No Features to graph!")
+            raise OrderOfOperationsError("No Features to graph!")
 
     def validate(self):
         # right now this just prints to stdout

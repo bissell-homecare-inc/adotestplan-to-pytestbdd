@@ -4,6 +4,10 @@ from dotenv import load_dotenv
 from pytest import fixture, raises
 
 from adotestplan_to_pytestbdd import ADOTestPlan
+from adotestplan_to_pytestbdd.exceptions import (InvalidGherkinError,
+                                                 InvalidParameterError,
+                                                 MissingFixturesError,
+                                                 OrderOfOperationsError)
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -101,7 +105,7 @@ def test_init_default_args():
 
 
 def test_populate_non_configured(default_tp):
-    with raises(ValueError):
+    with raises(OrderOfOperationsError):
         default_tp.populate()
 
 
@@ -111,7 +115,7 @@ def test_populate_empty(empty_tp):
 
 
 def test_write_feature_files_non_configured(default_tp):
-    with raises(ValueError):
+    with raises(OrderOfOperationsError):
         default_tp.write_feature_files()
 
 
@@ -120,7 +124,7 @@ def test_write_feature_files(populated_and_written_tp):
 
 
 def test_generate_scenario_runners_without_populating(unique_outdir_tp):
-    with raises(FileNotFoundError):
+    with raises(OrderOfOperationsError):
         unique_outdir_tp.write_pytestbdd_runners()
 
 
@@ -129,7 +133,7 @@ def test_generate_scenario_runners(populated_and_written_tp):
 
 
 def test_usage_graph_generation_without_populating():
-    with raises(ValueError):
+    with raises(OrderOfOperationsError):
         ADOTestPlan(organization_url=org_url).generate_usage_graph()
 
 
@@ -166,15 +170,15 @@ def test_validate_pytestbdd_runners(populated_and_written_tp):
 
 def test_validate_missing_fixtures(missing_fixtures_tp):
     missing_fixtures_tp.write_pytestbdd_runners()
-    with raises(ValueError):
+    with raises(MissingFixturesError):
         missing_fixtures_tp.validate_pytestbdd_runners_against_feature_files()
 
 
 def test_empty_parameter_raises_exception(empty_parameters_tp):
-    with raises(ValueError):
+    with raises(InvalidParameterError):
         empty_parameters_tp.populate()
 
 
 def test_validate_invalid_gherkin(invalid_gherkin_tp):
-    with raises(ValueError):
+    with raises(InvalidGherkinError):
         invalid_gherkin_tp.populate()

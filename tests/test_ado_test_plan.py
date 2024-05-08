@@ -4,10 +4,12 @@ from dotenv import load_dotenv
 from pytest import fixture, raises
 
 from adotestplan_to_pytestbdd import ADOTestPlan
-from adotestplan_to_pytestbdd.exceptions import (InvalidGherkinError,
-                                                 InvalidParameterError,
-                                                 MissingFixturesError,
-                                                 OrderOfOperationsError)
+from adotestplan_to_pytestbdd.exceptions import (
+    InvalidGherkinError,
+    InvalidParameterError,
+    MissingFixturesError,
+    OrderOfOperationsError,
+)
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -27,7 +29,7 @@ def default_tp():
 
 @fixture
 def unique_outdir_tp(default_tp):
-    default_tp.out_dir = 'xyz'
+    default_tp.out_dir = "xyz"
     yield default_tp
 
 
@@ -42,7 +44,7 @@ def empty_tp(default_tp):
 def populated_non_empty_tp(default_tp):
     default_tp.plan_id = os.getenv("TEST_NON_EMPTY_TP")
     default_tp.project = proj
-    default_tp.out_dir = 'default_tp'
+    default_tp.out_dir = "default_tp"
     default_tp.populate()
     yield default_tp
 
@@ -50,8 +52,7 @@ def populated_non_empty_tp(default_tp):
 @fixture
 def populated_and_written_tp(populated_non_empty_tp):
     populated_non_empty_tp.write_feature_files()
-    populated_non_empty_tp.fixtures = os.path.join(
-        root_path, 'fixtures_under_test')
+    populated_non_empty_tp.fixtures = os.path.join(root_path, "fixtures_under_test")
     yield populated_non_empty_tp
 
 
@@ -59,16 +60,16 @@ def populated_and_written_tp(populated_non_empty_tp):
 def missing_fixtures_tp(populated_non_empty_tp):
     populated_non_empty_tp.write_feature_files()
     populated_non_empty_tp.fixtures = os.path.join(
-        root_path, 'missing_fixtures_example')
+        root_path, "missing_fixtures_example"
+    )
     yield populated_non_empty_tp
 
 
 @fixture
 def tp_with_shared_steps_and_shared_params(default_tp):
-    default_tp.plan_id = os.getenv(
-        "TEST_SHARED_STEPS_AND_SHARED_PARAMETERS_TP")
+    default_tp.plan_id = os.getenv("TEST_SHARED_STEPS_AND_SHARED_PARAMETERS_TP")
     default_tp.project = proj
-    default_tp.out_dir = 'shared_steps_and_params'
+    default_tp.out_dir = "shared_steps_and_params"
     yield default_tp
 
 
@@ -76,7 +77,7 @@ def tp_with_shared_steps_and_shared_params(default_tp):
 def tp_with_non_shared_params(default_tp):
     default_tp.plan_id = os.getenv("TEST_NON_SHARED_PARAMETERS_TP")
     default_tp.project = proj
-    default_tp.out_dir = 'nonshared_params'
+    default_tp.out_dir = "nonshared_params"
     yield default_tp
 
 
@@ -84,7 +85,7 @@ def tp_with_non_shared_params(default_tp):
 def invalid_gherkin_tp(default_tp):
     default_tp.plan_id = os.getenv("TEST_INVALID_GHERKIN_TP")
     default_tp.project = proj
-    default_tp.out_dir = 'invalid_gherkin_tp'
+    default_tp.out_dir = "invalid_gherkin_tp"
     yield default_tp
 
 
@@ -92,7 +93,7 @@ def invalid_gherkin_tp(default_tp):
 def empty_parameters_tp(default_tp):
     default_tp.plan_id = os.getenv("TEST_EMPTY_PARAMETERS_TP")
     default_tp.project = proj
-    default_tp.out_dir = 'empty_parameter_tp'
+    default_tp.out_dir = "empty_parameter_tp"
     yield default_tp
 
 
@@ -150,7 +151,9 @@ def test_nonshared_params_write(tp_with_non_shared_params):
     tp_with_non_shared_params.write_feature_files()
 
 
-def test_shared_params_and_shared_steps_populate(tp_with_shared_steps_and_shared_params):
+def test_shared_params_and_shared_steps_populate(
+    tp_with_shared_steps_and_shared_params,
+):
     tp_with_shared_steps_and_shared_params.populate()
 
 

@@ -766,7 +766,7 @@ class AzureDevOpsTestPlan:
             # loop through those work items, converting them to
             # BDD style "scenarios"
             scenario_work_items = self.witc.get_work_items(
-                ids=ids, project=self.project
+                ids=ids, project=self.project, expand="All"
             )
             for scenario_work_item in scenario_work_items:
                 scenario_work_item: WorkItem

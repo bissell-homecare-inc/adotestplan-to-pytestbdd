@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "adotestplan-to-pytestbdd"
-version = "0.1.5"
+version = "0.1.6"
 description = "Utility for translating AzureDevOps Test Plans to Gherkin Feature file and Pytest-BDD runners"
 authors = [
     "David VanKampen <david.vankampen@bissell.com>",

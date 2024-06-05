@@ -384,8 +384,11 @@ class AzureDevOpsTestPlan:
         """this subroutine replaces the parse placeholders in G/W/T
         clauses with their variable names"""
 
-        # pattern = re.escape(defined_fixture).replace(r'\{\}', r'(\S+)')
-        pattern = re.escape(defined_fixture).replace(r"\{\}", r"([^\s]+)")
+        # match alpha-numeric, spaces, underscores, slashes, and hyphens.
+        # the spaces portion is especially useful here because
+        # it lets us match multi-word strings.
+        # TODO - use the same parser library pytest-bdd uses
+        pattern = re.escape(defined_fixture).replace(r"\{\}", r"([a-zA-Z0-9 _\-<>\/]+)")
         match = re.match(pattern, needed_fixture)
 
         if match:

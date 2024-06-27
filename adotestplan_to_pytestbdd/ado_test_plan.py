@@ -791,6 +791,7 @@ class AzureDevOpsTestPlan:
                     logging.debug(
                         f"ignoring {scenario_work_item.id} as its state is {scenario_work_item.fields['System.State']}"
                     )
+                    continue
 
                 # convert this ADO work item to a BDD Scenario.
 

@@ -115,6 +115,7 @@ class AzureDevOpsTestPlan:
         fixtures: str = "fixtures",
         out_dir: str = "gen",
         ignore_tags_list: list = None,
+        ignore_states: list = None,
     ):
         timebudget.set_quiet()
         self.profile = profile
@@ -134,6 +135,10 @@ class AzureDevOpsTestPlan:
             self._ignore_tags_list = []
         else:
             self._ignore_tags_list = ignore_tags_list
+        if ignore_states is None:
+            self._ignore_states = []
+        else:
+            self._ignore_states = ignore_states
         # pre-populate some fields
         self.bdd_tp = BDDTestPlan()
         self._azure_test_suites = []
@@ -231,6 +236,14 @@ class AzureDevOpsTestPlan:
     @ignore_tags_list.setter
     def ignore_tags_list(self, value):
         self._ignore_tags_list = value
+
+    @property
+    def ignore_states(self):
+        return self._ignore_states
+
+    @ignore_states.setter
+    def ignore_states(self, value):
+        self._ignore_states = value
 
     @timebudget
     def _build_examples_outline(self, nonshared_parameters, examples_to_match):
@@ -773,6 +786,11 @@ class AzureDevOpsTestPlan:
             )
             for scenario_work_item in scenario_work_items:
                 scenario_work_item: WorkItem
+
+                if scenario_work_item.fields["System.State"] in self.ignore_states:
+                    logging.debug(
+                        f"ignoring {scenario_work_item.id} as its state is {scenario_work_item.fields['System.State']}"
+                    )
 
                 # convert this ADO work item to a BDD Scenario.
 

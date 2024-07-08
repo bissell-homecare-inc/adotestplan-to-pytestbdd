@@ -1145,25 +1145,24 @@ class AzureDevOpsTestPlan:
         step_content = []
         # compare the element against the title?
         parameterized_string_elements = all_steps[0].findall("parameterizedString")
-        if parameterized_string_elements[0] is not None:
-            soup = BeautifulSoup(parameterized_string_elements[0].text, "html.parser")
-
-            # Find and extract the text content within the <P> element
-            p = soup.find("p")
-            if p:
-                content = p.get_text().strip()
-                if len(content):
-                    if content != title:
-                        content = self._ado_to_pytest_bdd_notation(content, id)
-                        step_content.append(
-                            f"# Shared step for {id}_Revision_{rev}: {title}"
-                        )  # noqa: E501
-                        step_content.append("\t\t" + content)
-                else:
-                    # likely a "then" where there is an expected result
-                    step_content = self._ado_to_pytest_bdd_notation(title, id)
+        # Find and extract the text content within the <P> element
+        p = BeautifulSoup(parameterized_string_elements[0].text, "html.parser").find(
+            "p"
+        )
+        if p:
+            content = p.get_text().strip()
+            if len(content):
+                if content != title:
+                    content = self._ado_to_pytest_bdd_notation(content, id)
+                    step_content.append(
+                        f"# Shared step for {id}_Revision_{rev}: {title}"
+                    )  # noqa: E501
+                    step_content.append("\t\t" + content)
             else:
+                # likely a "then" where there is an expected result
                 step_content = self._ado_to_pytest_bdd_notation(title, id)
+        else:
+            step_content = self._ado_to_pytest_bdd_notation(title, id)
         return step_content
 
     def _parse_shared_step_content(self, shared_step_item: WorkItem):

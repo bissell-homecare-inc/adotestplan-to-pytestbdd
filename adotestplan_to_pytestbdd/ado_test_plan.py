@@ -1043,14 +1043,13 @@ class AzureDevOpsTestPlan:
         all_elements = self._collect_steps_and_comprefs(root)
         for element in all_elements:
             if element.tag == "compref":
-                # compref inidicated a shared step, so add a placeholder for now
-                shared_step_id = element.get("ref")
-                step = Step()
-                step.id = shared_step_id
-                step.text = ""
+                # compref inidicated a shared step, but its possible that
+                # shared steps can themselves reference shared steps, so let's recurse into that.
 
-                # blank - will be linked later via a batched fetch
-                steps_for_item.append(step)
+                # note this isn't likely, since the ADO web front-end does not support adding shared
+                # steps to other shared steps, but this is possible via the REST API, so we should
+                # support it here, just in case.
+                steps_for_item.extend(self._follow_compref(element))
             elif element.tag == "step":
                 # this is a non-shared step. lets read it now.
                 parameterized_string_elements = element.findall("parameterizedString")
@@ -1076,93 +1075,132 @@ class AzureDevOpsTestPlan:
                         )  # noqa: E501
         return steps_for_item
 
+    def _follow_compref(self, element):
+        compref_steps = []
+        shared_step_id = element.get("ref")
+        step = Step()
+        step.id = shared_step_id
+        # blank - will be linked later via a batched fetch
+        step.text = ""
+        compref_steps.append(step)
+        return compref_steps
+
+    def _process_multiple_shared_steps(self, all_steps, id, title, rev):
+        step_content = []
+        first_step = True
+        contents_found = False
+        for sub_step in all_steps:
+            if sub_step.tag == "compref":
+                if first_step:
+                    step_content.append(
+                        f"# Start Shared Steps for {id}: {title} Revision {rev}"
+                    )
+                    first_step = False
+                shared_step_id = sub_step.get("ref")
+                if shared_step_id not in self._shared_steps:
+                    logging.warning(
+                        f"recursively getting new shared step {shared_step_id}"
+                    )
+                    self._shared_steps[shared_step_id] = (
+                        self._parse_shared_step_content(
+                            self.witc.get_work_item(
+                                id=shared_step_id, project=self.project
+                            )
+                        )
+                    )
+
+                content = self._shared_steps[shared_step_id]
+                if isinstance(content, list) and len(content):
+                    step_content.extend(content)
+                elif len(content) and "\t\t" not in content:
+                    content = "\t\t" + content
+                    step_content.append(content)
+            elif sub_step.tag == "step":
+                parameterized_string_elements = sub_step.findall("parameterizedString")
+                if parameterized_string_elements[0] is not None:
+                    soup = BeautifulSoup(
+                        parameterized_string_elements[0].text, "html.parser"
+                    )
+
+                    # Find and extract the text content within the <P> element
+                    p = soup.find("p")
+                    if p:
+                        content = p.get_text().strip()
+                        if content != "":
+                            content = self._ado_to_pytest_bdd_notation(content, id)
+                            contents_found = True
+                            if first_step:
+                                step_content.append(
+                                    f"# Start Shared Steps for {id}: {title} Revision {rev}"
+                                )  # noqa: E501
+                                first_step = False
+                            step_content.append("\t\t" + content)
+                        else:
+                            logging.warning(f"Empty step in {title}")
+        if not first_step:
+            step_content.append(f"\t\t# End Shared Steps for {id}")
+        if not contents_found:
+            logging.warning(f"Full contents of substep is empty for:\{title}")
+        return step_content
+
+    def _process_single_shared_step(self, all_steps, id, title, rev):
+        step_content = []
+        # compare the element against the title?
+        parameterized_string_elements = all_steps[0].findall("parameterizedString")
+        # Find and extract the text content within the <P> element
+        p = BeautifulSoup(parameterized_string_elements[0].text, "html.parser").find(
+            "p"
+        )
+        if p:
+            content = p.get_text().strip()
+            if len(content):
+                if content != title:
+                    content = self._ado_to_pytest_bdd_notation(content, id)
+                    step_content.append(
+                        f"# Shared step for {id}_Revision_{rev}: {title}"
+                    )  # noqa: E501
+                    step_content.append("\t\t" + content)
+                else:
+                    step_content = self._ado_to_pytest_bdd_notation(title, id)
+            else:
+                # likely a "then" where there is an expected result
+                step_content = self._ado_to_pytest_bdd_notation(title, id)
+        else:
+            step_content = self._ado_to_pytest_bdd_notation(title, id)
+        return step_content
+
     def _parse_shared_step_content(self, shared_step_item: WorkItem):
         """This subroutine takes a shared step work item and parses out
         every step from that work item into a list to populate step content with"""
         step_content = []
         title = shared_step_item.fields["System.Title"]
-        if "Microsoft.VSTS.TCM.Steps" in shared_step_item.fields:
-            possible_sub_steps = shared_step_item.fields["Microsoft.VSTS.TCM.Steps"]
-            sub_root = ET.fromstring(possible_sub_steps)
-
-            sub_all_elements = self._collect_steps_and_comprefs(sub_root)
-            contents_found = False
-            if len(sub_all_elements) > 1:
-                first_step = True
-
-                for sub_step in sub_all_elements:
-                    # content = self._parse_substep(sub_step)
-                    parameterized_string_elements = sub_step.findall(
-                        "parameterizedString"
-                    )
-                    if parameterized_string_elements[0] is not None:
-                        soup = BeautifulSoup(
-                            parameterized_string_elements[0].text, "html.parser"
-                        )
-
-                        # Find and extract the text content within the <P> element
-                        p = soup.find("p")
-                        if p:
-                            content = p.get_text().strip()
-                            if content != "":
-                                content = self._ado_to_pytest_bdd_notation(
-                                    content, shared_step_item.id
-                                )
-                                contents_found = True
-                                if first_step:
-                                    step_content.append(
-                                        f"# Start Shared Steps for {shared_step_item.id}: {title} Revision {shared_step_item.rev}"
-                                    )  # noqa: E501
-                                    first_step = False
-                                step_content.append("\t\t" + content)
-                            else:
-                                logging.warning(f"Empty step in {title}")
-                if not first_step:
-                    step_content.append(
-                        f"\t\t# End Shared Steps for {shared_step_item.id}"
-                    )
-                if not contents_found:
-                    logging.warning(
-                        f"Full contents of substep is empty for:\
-    {title}"
-                    )
-            else:
-                if len(sub_all_elements) == 1:
-                    # compare the element against the title?
-                    parameterized_string_elements = sub_all_elements[0].findall(
-                        "parameterizedString"
-                    )
-                    if parameterized_string_elements[0] is not None:
-                        soup = BeautifulSoup(
-                            parameterized_string_elements[0].text, "html.parser"
-                        )
-
-                        # Find and extract the text content within the <P> element
-                        p = soup.find("p")
-                        if p:
-                            content = p.get_text().strip()
-                            if len(content):
-                                if content != title:
-                                    content = self._ado_to_pytest_bdd_notation(
-                                        content, shared_step_item.id
-                                    )
-                                    step_content.append(
-                                        f"# Shared step for {shared_step_item.id}_Revision_{shared_step_item.rev}: {title}"
-                                    )  # noqa: E501
-                                    step_content.append("\t\t" + content)
-                                    return step_content
-                            else:
-                                # likely a "then" where there is an expected result
-                                content = self._ado_to_pytest_bdd_notation(
-                                    title, shared_step_item.id
-                                )
-                                return content
-                content = self._ado_to_pytest_bdd_notation(title, shared_step_item.id)
-                return content
-            return step_content
+        self._shared_step_depth += 1
+        if self._shared_step_depth > 10:
+            raise RecursionError(
+                f"Too many nested shared steps, detected while processing {shared_step_item.id} ({title})"
+            )
+        elif "Microsoft.VSTS.TCM.Steps" in shared_step_item.fields:
+            steps_root = ET.fromstring(
+                shared_step_item.fields["Microsoft.VSTS.TCM.Steps"]
+            )
+            all_steps = self._collect_steps_and_comprefs(steps_root)
+            if len(all_steps) > 1:
+                step_content = self._process_multiple_shared_steps(
+                    all_steps, shared_step_item.id, title, shared_step_item.rev
+                )
+            elif len(all_steps) == 1:
+                step_content = self._process_single_shared_step(
+                    all_steps, shared_step_item.id, title, shared_step_item.rev
+                )
+            else:  # no steps - use the work-item title as the step contents
+                step_content = self._ado_to_pytest_bdd_notation(
+                    title, shared_step_item.id
+                )
         else:
-            content = self._ado_to_pytest_bdd_notation(title, shared_step_item.id)
-            return [content]
+            step_content = [
+                self._ado_to_pytest_bdd_notation(title, shared_step_item.id)
+            ]
+        return step_content
 
     @timebudget
     def _get_azure_shared_steps(self):
@@ -1188,6 +1226,7 @@ class AzureDevOpsTestPlan:
                 if id in self._shared_steps:
                     logging.info(f"already fetched shared step {id}")
                 else:
+                    self._shared_step_depth = 0
                     self._shared_steps[id] = self._parse_shared_step_content(
                         shared_step_item
                     )

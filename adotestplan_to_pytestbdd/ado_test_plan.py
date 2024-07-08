@@ -1158,6 +1158,8 @@ class AzureDevOpsTestPlan:
                         f"# Shared step for {id}_Revision_{rev}: {title}"
                     )  # noqa: E501
                     step_content.append("\t\t" + content)
+                else:
+                    step_content = self._ado_to_pytest_bdd_notation(title, id)
             else:
                 # likely a "then" where there is an expected result
                 step_content = self._ado_to_pytest_bdd_notation(title, id)
@@ -1187,10 +1189,6 @@ class AzureDevOpsTestPlan:
             elif len(all_steps) == 1:
                 step_content = self._process_single_shared_step(
                     all_steps, shared_step_item.id, title, shared_step_item.rev
-                )
-            else:  # no steps - use the work-item title as the step contents
-                step_content = self._ado_to_pytest_bdd_notation(
-                    title, shared_step_item.id
                 )
         else:
             step_content = [

@@ -1101,7 +1101,6 @@ class AzureDevOpsTestPlan:
                     logging.warning(
                         f"recursively getting new shared step {shared_step_id}"
                     )
-
                     self._shared_steps[shared_step_id] = (
                         self._parse_shared_step_content(
                             self.witc.get_work_item(
@@ -1109,10 +1108,13 @@ class AzureDevOpsTestPlan:
                             )
                         )
                     )
+
                 content = self._shared_steps[shared_step_id]
-                if "\t\t" not in content:
+                if isinstance(content, list) and len(content):
+                    step_content.extend(content)
+                elif len(content) and "\t\t" not in content:
                     content = "\t\t" + content
-                step_content.append(content)
+                    step_content.append(content)
             elif sub_step.tag == "step":
                 parameterized_string_elements = sub_step.findall("parameterizedString")
                 if parameterized_string_elements[0] is not None:
@@ -1189,6 +1191,10 @@ class AzureDevOpsTestPlan:
             elif len(all_steps) == 1:
                 step_content = self._process_single_shared_step(
                     all_steps, shared_step_item.id, title, shared_step_item.rev
+                )
+            else:  # no steps - use the work-item title as the step contents
+                step_content = self._ado_to_pytest_bdd_notation(
+                    title, shared_step_item.id
                 )
         else:
             step_content = [

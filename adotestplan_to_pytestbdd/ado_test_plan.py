@@ -1043,14 +1043,13 @@ class AzureDevOpsTestPlan:
         all_elements = self._collect_steps_and_comprefs(root)
         for element in all_elements:
             if element.tag == "compref":
-                # compref inidicated a shared step, so add a placeholder for now
-                shared_step_id = element.get("ref")
-                step = Step()
-                step.id = shared_step_id
-                step.text = ""
+                # compref inidicated a shared step, but its possible that
+                # shared steps can themselves reference shared steps, so let's recurse into that.
 
-                # blank - will be linked later via a batched fetch
-                steps_for_item.append(step)
+                # note this isn't likely, since the ADO web front-end does not support adding shared
+                # steps to other shared steps, but this is possible via the REST API, so we should
+                # support it here, just in case.
+                steps_for_item.extend(self._follow_compref(element))
             elif element.tag == "step":
                 # this is a non-shared step. lets read it now.
                 parameterized_string_elements = element.findall("parameterizedString")
@@ -1076,6 +1075,16 @@ class AzureDevOpsTestPlan:
                         )  # noqa: E501
         return steps_for_item
 
+    def _follow_compref(self, element):
+        compref_steps = []
+        shared_step_id = element.get("ref")
+        step = Step()
+        step.id = shared_step_id
+        # blank - will be linked later via a batched fetch
+        step.text = ""
+        compref_steps.append(step)
+        return compref_steps
+
     def _parse_shared_step_content(self, shared_step_item: WorkItem):
         """This subroutine takes a shared step work item and parses out
         every step from that work item into a list to populate step content with"""
@@ -1091,32 +1100,55 @@ class AzureDevOpsTestPlan:
                 first_step = True
 
                 for sub_step in sub_all_elements:
-                    # content = self._parse_substep(sub_step)
-                    parameterized_string_elements = sub_step.findall(
-                        "parameterizedString"
-                    )
-                    if parameterized_string_elements[0] is not None:
-                        soup = BeautifulSoup(
-                            parameterized_string_elements[0].text, "html.parser"
-                        )
+                    if sub_step.tag == "compref":
+                        if first_step:
+                            step_content.append(
+                                f"# Start Shared Steps for {shared_step_item.id}: {title} Revision {shared_step_item.rev}"
+                            )
+                            first_step = False
+                        shared_step_id = sub_step.get("ref")
+                        if shared_step_id not in self._shared_steps:
+                            logging.warning(
+                                f"recursively getting new shared step {shared_step_id}"
+                            )
 
-                        # Find and extract the text content within the <P> element
-                        p = soup.find("p")
-                        if p:
-                            content = p.get_text().strip()
-                            if content != "":
-                                content = self._ado_to_pytest_bdd_notation(
-                                    content, shared_step_item.id
+                            self._shared_steps[shared_step_id] = (
+                                self._parse_shared_step_content(
+                                    self.witc.get_work_item(
+                                        id=shared_step_id, project=self.project
+                                    )
                                 )
-                                contents_found = True
-                                if first_step:
-                                    step_content.append(
-                                        f"# Start Shared Steps for {shared_step_item.id}: {title} Revision {shared_step_item.rev}"
-                                    )  # noqa: E501
-                                    first_step = False
-                                step_content.append("\t\t" + content)
-                            else:
-                                logging.warning(f"Empty step in {title}")
+                            )
+                        content = self._shared_steps[shared_step_id]
+                        if "\t\t" not in content:
+                            content = "\t\t" + content
+                        step_content.append(content)
+                    elif sub_step.tag == "step":
+                        parameterized_string_elements = sub_step.findall(
+                            "parameterizedString"
+                        )
+                        if parameterized_string_elements[0] is not None:
+                            soup = BeautifulSoup(
+                                parameterized_string_elements[0].text, "html.parser"
+                            )
+
+                            # Find and extract the text content within the <P> element
+                            p = soup.find("p")
+                            if p:
+                                content = p.get_text().strip()
+                                if content != "":
+                                    content = self._ado_to_pytest_bdd_notation(
+                                        content, shared_step_item.id
+                                    )
+                                    contents_found = True
+                                    if first_step:
+                                        step_content.append(
+                                            f"# Start Shared Steps for {shared_step_item.id}: {title} Revision {shared_step_item.rev}"
+                                        )  # noqa: E501
+                                        first_step = False
+                                    step_content.append("\t\t" + content)
+                                else:
+                                    logging.warning(f"Empty step in {title}")
                 if not first_step:
                     step_content.append(
                         f"\t\t# End Shared Steps for {shared_step_item.id}"
